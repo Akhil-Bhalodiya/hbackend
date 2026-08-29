@@ -18,30 +18,63 @@ connectDB();
 
 const app = express();
 
-// Middleware setup
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Helper to clean and strip trailing slashes from URLs
+const cleanUrl = (url) => (url ? url.trim().replace(/\/+$/, '') : '');
 
-// Dynamic CORS origin handling
+// Parse CLIENT_ORIGIN (supports comma-separated origins)
+const envOrigins = (process.env.CLIENT_ORIGIN || '')
+  .split(',')
+  .map(cleanUrl)
+  .filter(Boolean);
+
 const allowedOrigins = [
-  process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  ...envOrigins,
+  'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
+  'https://hibbiscuss.vercel.app',
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Allow all origins in dev mode if needed
-      }
-    },
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+
+    const reqOrigin = cleanUrl(origin);
+
+    const isAllowed =
+      allowedOrigins.includes(reqOrigin) ||
+      /\.vercel\.app$/.test(reqOrigin);
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Allow-Headers',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers',
+  ],
+  optionsSuccessStatus: 200,
+};
+
+// Enable CORS for all routes and preflight requests before body parsing
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// Middleware setup
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));

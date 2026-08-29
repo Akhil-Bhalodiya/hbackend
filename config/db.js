@@ -3,14 +3,49 @@ const dns = require('dns');
 
 dns.setDefaultResultOrder('ipv4first');
 
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
 const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/hibiscus_db');
-    console.log(`[MongoDB] Connected: ${conn.connection.host} / ${conn.connection.name}`);
-  } catch (error) {
-    console.error(`[MongoDB Error] ${error.message}`);
-    // Don't exit process in non-fatal cases so server can display health error or retry
+  if (cached.conn && mongoose.connection.readyState === 1) {
+    return cached.conn;
   }
+
+  const mongoUri = process.env.MONGO_URI;
+  if (!mongoUri) {
+    console.error('[MongoDB Error] MONGO_URI environment variable is missing!');
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 8000,
+    };
+
+    cached.promise = mongoose
+      .connect(mongoUri || 'mongodb://127.0.0.1:27017/hibiscus_db', opts)
+      .then((mongooseInstance) => {
+        console.log(`[MongoDB] Connected: ${mongooseInstance.connection.host} / ${mongooseInstance.connection.name}`);
+        return mongooseInstance;
+      })
+      .catch((err) => {
+        cached.promise = null;
+        console.error(`[MongoDB Error] Connection failed: ${err.message}`);
+        throw err;
+      });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+
+  return cached.conn;
 };
 
 module.exports = connectDB;

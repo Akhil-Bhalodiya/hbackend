@@ -94,6 +94,21 @@ app.get('/', (req, res) => {
   });
 });
 
+// Database connection middleware to ensure DB is ready before queries run
+app.use(async (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Database connection failed. Please ensure MONGO_URI is set correctly in Vercel environment variables.',
+      error: error.message,
+    });
+  }
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);

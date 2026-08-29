@@ -61,7 +61,9 @@ const createApplication = async (req, res, next) => {
     // 2. Safe Server-Side Forwarding to Google Sheets Webhook
     try {
       const setting = await Setting.findOne().sort({ createdAt: -1 });
-      const targetUrl = cleanWebhookUrl(setting ? setting.cvUploadUrl : '');
+      const targetUrl =
+        cleanWebhookUrl(setting ? setting.cvUploadUrl : '') ||
+        cleanWebhookUrl(process.env.CV_UPLOAD_WEBHOOK_URL || '');
 
       if (targetUrl) {
         const payload = {

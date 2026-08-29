@@ -41,7 +41,9 @@ const createInquiry = async (req, res, next) => {
     // 2. Safe Server-Side Forwarding to Google Sheets Webhook
     try {
       const setting = await Setting.findOne().sort({ createdAt: -1 });
-      const targetUrl = cleanWebhookUrl(setting ? setting.inquiryUrl : '');
+      const targetUrl =
+        cleanWebhookUrl(setting ? setting.inquiryUrl : '') ||
+        cleanWebhookUrl(process.env.INQUIRY_WEBHOOK_URL || '');
 
       if (targetUrl) {
         const payload = {
